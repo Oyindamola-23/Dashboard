@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Product Recommendation Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+
+        .header {
+            background-color: #333;
+            color: #fff;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #customerAnalysis {
+            width: 100%;
+            height: 400px;
+        }
+
+        #backButton {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 10px;
+            background-color: #333;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        table, th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Product Recommendation Dashboard</h1>
+    </div>
+    <div class="container">
+        <div>
+            <h2>Customer Analysis Chart</h2>
+        </div>
+        <canvas id="customerAnalysis"></canvas>
+        <div id="customerAnalysisTable"></div>
+    </div>
+    <button id="backButton" onclick="window.history.back()">Back</button>
+    <script>
+        function fetchCustomerAnalysisData() {
+            fetch('/result2c', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({})
+            })
+            .then(response => response.json())
+            .then(data => {
+                const returningCustomersQty = data['Number of Returning Customers'];
+                const nonReturningCustomersQty = data['Number of Non-Returning Customers'];
+        
+                const ctx = document.getElementById('customerAnalysis').getContext('2d');
+                const chart = new Chart(ctx, {
+                    type: 'pie',
+                    data: {
+                        labels: ['Returning Customers', 'Non-Returning Customers'],
+                        datasets: [{
+                            label: 'Customer Analysis',
+                            data: [returningCustomersQty, nonReturningCustomersQty],
+                            backgroundColor: [
+                                'rgba(75, 192, 192, 0.5)',
+                                'rgba(255, 99, 132, 0.5)'
+                            ],
+                            borderColor: [
+                                'rgba(75, 192, 192, 1)',
+                                'rgba(255, 99, 132, 1)'
+                            ],
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Customer Analysis'
+                            }
+                        },
+                        onClick: function(event) {
+                            const activeElement = chart.getElementsAtEventForMode(event, 'nearest', { intersect: true });
+                            if (activeElement.length > 0) {
+                                const index = activeElement[0].index;
+                                const dataset = chart.data.datasets[0];
+                                const total = dataset.data.reduce((acc, cur) => acc + cur, 0);
+                                const percentage = ((dataset.data[index] / total) * 100).toFixed(2);
+                                alert(`${dataset.labels[index]}: ${percentage}%`);
+                            }
+                        }
+                    }
+                });
+        
+                updateCustomerAnalysisTable(data);
+            })
+            .catch(error => console.error('Error fetching customer analysis data:', error));
+        }        
+
+        function updateCustomerAnalysisTable(data) {
+            const returningCustomersQty = data['Number of Returning Customers'];
+            const nonReturningCustomersQty = data['Number of Non-Returning Customers'];
+            const returningCustomersPercentage = data['Returning Customers Percentage'];
+            const nonReturningCustomersPercentage = data['Non-Returning Customers Percentage'];
+
+            const tableHtml = `
+                <h2>Customer Analysis Table</h2>
+                <table>
+                    <tr>
+                        <th>Customer Type</th>
+                        <th>Total Quantity Sold</th>
+                        <th>Total Sales (NGN)</th>
+                        <th>Number of Customers</th>
+                        <th>Percentage of Customers (%)</th>
+                    </tr>
+                    <tr>
+                        <td>Returning Customers</td>
+                        <td>${data['Returning Customers']['Total Quantity Sold']}</td>
+                        <td>${data['Returning Customers']['Total Sales'] / 100}</td>
+                        <td>${returningCustomersQty}</td>
+                        <td>${returningCustomersPercentage.toFixed(2)}</td>
+                    </tr>
+                    <tr>
+                        <td>Non-Returning Customers</td>
+                        <td>${data['Non-Returning Customers']['Total Quantity Sold']}</td>
+                        <td>${data['Non-Returning Customers']['Total Sales'] / 100}</td>
+                        <td>${nonReturningCustomersQty}</td>
+                        <td>${nonReturningCustomersPercentage.toFixed(2)}</td>
+                    </tr>
+                </table>
+            `;
+            document.getElementById('customerAnalysisTable').innerHTML = tableHtml;
+        }
+
+        window.addEventListener('load', () => {
+            fetchCustomerAnalysisData();
+        });
+    </script>
+</body>
+</html>

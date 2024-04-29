@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sales Trends Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+
+        .header {
+            background-color: #333;
+            color: #fff;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            position: relative; /* Position container relatively */
+            display: flex; /* Use flexbox for layout */
+            flex-direction: column; /* Stack children vertically */
+        }
+
+        #salesChart {
+            width: 100%;
+            height: 600px; /* Increased canvas height */
+        }
+
+        #periodForm {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+        }
+
+        #backButton {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 10px;
+            background-color: #333;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .totals-container {
+            margin-bottom: 20px; /* Add some margin at the bottom */
+            display: flex;
+            justify-content: space-between;
+            background-color: #fff;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .total-sales, .total-units {
+            flex-basis: 45%;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            padding: 10px;
+            background-color: #fff; /* Add white background */
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Sales Trends Dashboard</h1>
+    </div>
+    <div class="totals-container">
+        <div class="total-sales">
+            <h2>Total Sales</h2>
+            <p>{{ total_sales | round(2) }}</p>
+        </div>
+        <div class="total-units">
+            <h2>Total Quantity Sold</h2>
+            <p>{{ total_quantity_sold }}</p>
+        </div>
+    </div>
+    <div class="container">
+        <div>
+            <h2>Sales Forecast Chart</h2>
+        </div>
+        <form id="periodForm" method="post">
+            <label for="period">Sales Forecast</label>
+            <select name="period" id="period">
+                <option value="daily">Daily</option>
+                <option value="monthly">Monthly</option>
+                <option value="quarterly">Quarterly</option>
+                <option value="yearly">Yearly</option>
+            </select>
+            <input type="submit" value="Generate Forecast">
+        </form>
+        <div class="chart-container">
+            <!-- Canvas for Chart.js chart -->
+            <canvas id="salesChart"></canvas>
+        </div>
+    <!-- Back button -->
+    <button id="backButton" onclick="window.history.back()">Back</button>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            let chart = null; // Variable to hold the chart instance
+            
+            // Function to convert timestamp to date format
+            function formatDate(timestamp) {
+                const date = new Date(timestamp);
+                const day = date.getDate();
+                const month = date.getMonth() + 1;
+                const year = date.getFullYear();
+                return year + '-' + month + '-' + day;
+            }
+        
+            document.getElementById('periodForm').addEventListener('submit', function (e) {
+                e.preventDefault(); // Prevent default form submission
+                const formData = new FormData(this); // Get form data
+                
+                // Destroy the existing chart if it exists
+                if (chart) {
+                    chart.destroy();
+                }
+        
+                // Send form data to the server using fetch
+                fetch('/result1', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json(); // Parse response JSON
+                })
+                .then(data => {
+                    console.log('Response from server:', data); // Log the response data
+                    
+                    // Handle response data
+                    const convertedData = data.forecast_data.map(entry => ({
+                        Date: formatDate(entry.Date),
+                        'Forecasted Sales': entry['Forecasted Sales'],
+                        'Upper Bound': entry['Upper Bound'],
+                        'Lower Bound': entry['Lower Bound']
+                    }));
+        
+                    console.log('Converted data:', convertedData); // Log the converted data
+                    
+                    // Plot the graph
+                    const dates = convertedData.map(entry => entry.Date);
+                    const forecastedSales = convertedData.map(entry => entry['Forecasted Sales']);
+                    const upperBound = convertedData.map(entry => entry['Upper Bound']);
+                    const lowerBound = convertedData.map(entry => entry['Lower Bound']);
+        
+                    const ctx = document.getElementById('salesChart').getContext('2d');
+        
+                    chart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: dates,
+                            datasets: [{
+                                label: 'Forecast',
+                                data: forecastedSales,
+                                borderColor: 'steelblue',
+                                fill: false
+                            }, {
+                                label: 'Upper Bound',
+                                data: upperBound,
+                                borderColor: 'green',
+                                fill: false
+                            }, {
+                                label: 'Lower Bound',
+                                data: lowerBound,
+                                borderColor: 'red',
+                                fill: false
+                            }]
+                        },
+                        options: {
+                            title: {
+                                display: true,
+                                text: 'Sales Forecast' // Set the chart title
+                            },
+                            legend: {
+                                position: 'left', // Set legend position to left
+                            },
+                            scales: {
+                                xAxes: [{
+                                    type: 'time', // Use time scale for dates
+                                    time: {
+                                        unit: 'day' // Display unit as day
+                                    },
+                                    scaleLabel: {
+                                        display: true,
+                                        labelString: 'Date' // Set the x-axis label
+                                    }
+                                }],
+                                yAxes: [{
+                                    scaleLabel: {
+                                        display: true,
+                                        labelString: 'Amount (NGN)' // Set the y-axis label to NGN
+                                    }
+                                }]
+                            },
+                            tooltips: {
+                                callbacks: {
+                                    label: function(tooltipItem, data) {
+                                        let datasetLabel = data.datasets[tooltipItem.datasetIndex].label || '';
+                                        let value = tooltipItem.yLabel;
+                                        if (datasetLabel === 'Forecasted Sales') {
+                                            datasetLabel = 'Date: ' + data.labels[tooltipItem.index];
+                                        }
+                                        return datasetLabel + ': ' + value + ' NGN';
+                                    }
+                                }
+                            }
+                        }
+                    });
+        
+                    // Add click event listener to the chart
+                    salesChart.onclick = function(event) {
+                        let activePoints = chart.getElementsAtEventForMode(event, 'nearest', { intersect: true }, true);
+                        if (activePoints.length > 0) {
+                            let clickedDatasetIndex = activePoints[0].datasetIndex;
+                            let clickedElementIndex = activePoints[0].index;
+                            let clickedLabel = chart.data.labels[clickedElementIndex];
+                            let clickedValue = chart.data.datasets[clickedDatasetIndex].data[clickedElementIndex];
+                            let datasetLabel = chart.data.datasets[clickedDatasetIndex].label;
+        
+                            if (datasetLabel === 'Forecasted Sales') {
+                                alert('Date: ' + clickedLabel + '\nForecasted Sales: ' + clickedValue + ' NGN');
+                            } else {
+                                alert('Date: ' + clickedLabel + '\n' + datasetLabel + ': ' + clickedValue + ' NGN');
+                            }
+                        }
+                    };
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    // Log the response text if available
+                    console.error('Response Text:', error?.response?.text);
+                });
+            });                              
+        });                
+    </script>        
+</body>
+</html>

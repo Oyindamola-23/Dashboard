@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Login</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <style>
+        body {
+            background-color: white;
+            color: black;
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .loader {
+            border: 8px solid #f3f3f3;
+            border-top: 8px solid #3498db;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .login-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #loginTitle {
+            text-align: center;
+            font-size: 36px;
+            margin-bottom: 20px;
+            margin-top: 20px;
+        }
+
+        form {
+            width: 500px; /* Adjusted form width */
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        input[type="text"],
+        input[type="password"] {
+            width: calc(100% - 40px); /* Adjusted width */
+            padding: 15px 30px 15px 15px; /* Added padding */
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+
+        .password-container {
+            position: relative;
+            width: calc(100% - 40px); /* Adjusted width */
+        }
+
+        .password-icon {
+            position: absolute;
+            right: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            padding: 0 10px; /* Added padding */
+        }        
+
+        input[type="submit"] {
+            width: 100%;
+            padding: 15px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+            font-size: 20px; /* Increased font size */
+        }
+
+        input[type="submit"]:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="loader" id="loader" style="display:none;"></div>
+    <div class="login-container">
+        <h1 id="loginTitle">User Login</h1>
+        <form id="loginForm" action="/login" method="post">
+            <label for="username">Username:</label>
+            <input type="text" id="username" name="username">
+            <label for="password">Password:</label>
+            <div class="password-container">
+                <input type="password" id="password" name="password">
+                <label for="showPassword" class="password-icon" id="showPasswordIcon"><i class="fas fa-eye"></i></label>
+            </div>
+            <label for="storeID">Store ID:</label>
+            <input type="text" id="storeID" name="storeID">
+            <input type="submit" value="Login">
+        </form>
+    </div>
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            const loader = document.getElementById('loader');
+            loader.style.display = 'block';
+            const response = await fetch('/login', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+            loader.style.display = 'none';
+            if (data.error) {
+                alert(data.error);
+            } else {
+                localStorage.setItem('access_token', data.access_token);
+                localStorage.setItem('session_id', data.session_id);
+                localStorage.setItem('store_id', data.store_id);
+                window.location.href = '/analysis';
+            }
+        });
+
+        // Toggle password visibility
+        const passwordField = document.getElementById('password');
+        const showPasswordIcon = document.getElementById('showPasswordIcon');
+        showPasswordIcon.addEventListener('click', function() {
+            const type = passwordField.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordField.setAttribute('type', type);
+            this.querySelector('i').classList.toggle('fa-eye');
+            this.querySelector('i').classList.toggle('fa-eye-slash');
+        });
+    </script>
+</body>
+</html>

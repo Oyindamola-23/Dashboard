@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Analysis</title>
+    <style>
+        body {
+            background-color: white;
+            color: black;
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .container {
+            text-align: center;
+        }
+
+        .analysis-container {
+            margin-bottom: 20px;
+        }
+
+        form {
+            width: 500px;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        input[type="text"],
+        input[type="date"],
+        input[type="submit"],
+        select {
+            width: calc(100% - 40px);
+            padding: 15px 30px 15px 15px;
+            margin-bottom: 5px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+
+        input[type="submit"] {
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+            font-size: 18px;
+        }
+
+        input[type="submit"]:hover {
+            background-color: #0056b3;
+        }
+
+        #result {
+            margin-top: 20px;
+        }
+
+        .loader {
+            border: 8px solid #f3f3f3;
+            border-top: 8px solid #3498db;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            display: none;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        #backButton {
+            margin-top: 10px;
+            background-color: #808080;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        #backButton:hover {
+            background-color: #606060;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="analysis-container">
+            <h1>Analysis</h1>
+        </div>
+        <form id="analysisForm" action="/analyze" method="post">
+            <input type="hidden" id="access_token" name="access_token" value="">
+            <input type="hidden" id="session_id" name="session_id" value="">
+            <input type="hidden" id="store_id" name="store_id" value="">
+            <label for="analysis_type">Analysis Type:</label>
+            <select id="analysis_type" name="analysis_type">
+                <option value="1">Sales Trends Dashboard</option>
+                <option value="2">Product Recommendation Dashboard</option>
+            </select>
+            <label for="start_date">Start Date:</label>
+            <input type="date" id="start_date" name="start_date">
+            <label for="end_date">End Date:</label>
+            <input type="date" id="end_date" name="end_date">
+            <input type="submit" value="Submit">
+            <div class="loader" id="loader"></div> <!-- Loading spinner -->
+        </form>
+        <button id="backButton">Back</button>
+    </div>
+    <script>
+        // Fetch access token, session ID, and store ID from local storage
+        const accessToken = localStorage.getItem('access_token');
+        const sessionId = localStorage.getItem('session_id');
+        const storeId = localStorage.getItem('store_id');
+        if (!accessToken || !sessionId || !storeId) {
+            alert('Access token, session ID, or store ID not found. Please login again.');
+            window.location.href = '/'; // Redirect to login page
+        }
+        // Set access token, session ID, and store ID in the form
+        document.getElementById('access_token').value = accessToken;
+        document.getElementById('session_id').value = sessionId;
+        document.getElementById('store_id').value = storeId;
+
+        // Handle form submission
+        document.getElementById('periodForm').addEventListener('submit', function (e) {
+            e.preventDefault(); // Prevent default form submission
+            var formData = new FormData(this); // Get form data
+            console.log('Form data:', formData);
+            fetch('/analyze', { // Send form data to analyze route
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json(); // Parse response JSON
+            })
+            .then(data => {
+                // Handle redirection
+                console.log('Redirecting to:', data.redirect_url);
+                window.location.href = data.redirect_url;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                // Handle errors (if needed)
+            });
+        });
+
+        // Back button functionality
+        document.getElementById('backButton').addEventListener('click', function() {
+            window.history.back(); // Go back to the previous page
+        });
+    </script>
+</body>
+</html>
