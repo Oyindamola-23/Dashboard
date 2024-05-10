@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sales Trends Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+
+        .header {
+            background-color: #333;
+            color: #fff;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            position: relative; /* Position container relatively */
+            display: flex; /* Use flexbox for layout */
+            flex-direction: column; /* Stack children vertically */
+        }
+
+        #peakSalesChart {
+            width: 100%;
+            height: 600px; /* Increased canvas height */
+        }
+
+        #backButton {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 10px;
+            background-color: #333;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .totals-container {
+            margin-bottom: 20px; /* Add some margin at the bottom */
+            display: flex;
+            justify-content: space-between;
+            background-color: #fff;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .total-sales,
+        .total-units {
+            flex-basis: 45%;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            padding: 10px;
+            background-color: #fff; /* Add white background */
+        }
+
+        /* Style for the period form */
+        #periodForm {
+            position: absolute;
+            top: 20px;
+            right: 20px; /* Adjust right positioning */
+            display: flex; /* Use flexbox for layout */
+            align-items: center; /* Center items vertically */
+        }
+
+        #periodForm label {
+            margin-right: 10px; /* Add some space between label and select */
+        }
+
+        #periodForm select {
+            margin-right: 10px; /* Add some space between select and input */
+        }
+
+        #periodForm input[type="submit"] {
+            padding: 8px 15px; /* Adjust padding */
+            background-color: #333;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Sales Trends Dashboard</h1>
+    </div>
+    <div class="container">
+        <div>
+            <h2>Peak Sales Period Chart</h2>
+        </div>
+        <form id="periodForm" method="post">
+            <label for="period">Peak Sales Period:</label>
+            <select name="period" id="period">
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+                <option value="quarterly">Quarterly</option>
+            </select>
+            <input type="submit" value="Generate Forecast">
+        </form>
+        <div class="chart-container">
+            <!-- Canvas for Chart.js chart -->
+            <canvas id="peakSalesChart"></canvas>
+        </div>
+    </div>
+    <!-- Back button -->
+    <button id="backButton" onclick="window.history.back()">Back</button>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // Function to fetch forecasted data from server
+            function fetchForecastData(period) {
+                fetch('/result1b', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: new URLSearchParams({
+                        'period': period
+                    })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Received Forecast Data:', data);
+                    if (data && data.peak_sales_period) {
+                        plotChart(data); // Plot chart with forecast data
+                    } else {
+                        throw new Error('Peak sales period data is not available or is not in the expected format');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+            }
+
+            // Function to plot the chart using Chart.js
+            function plotChart(data) {
+                try {
+                    // Parse the peak sales period data
+                    const peakSalesPeriod = data.peak_sales_period;
+                    
+                    // Extract dates, sales, and quantity sold from the parsed data
+                    const dates = peakSalesPeriod.map(entry => new Date(entry.DateTime));
+                    const sales = peakSalesPeriod.map(entry => entry.Sales);
+                    const quantitySold = peakSalesPeriod.map(entry => entry['Quantity Sold']);
+            
+                    // Get the canvas context
+                    const ctx = document.getElementById('peakSalesChart').getContext('2d');
+            
+                    // Create the chart
+                    new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: dates,
+                            datasets: [{
+                                label: 'Sales',
+                                data: sales,
+                                backgroundColor: 'blue'
+                            }, {
+                                label: 'Quantity Sold',
+                                data: quantitySold,
+                                backgroundColor: 'green'
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                x: {
+                                    type: 'time',
+                                    time: {
+                                        unit: 'day',
+                                        displayFormats: {
+                                            day: 'MMM DD YYYY' // Format the date as desired
+                                        }
+                                    },
+                                    title: {
+                                        display: true,
+                                        text: 'Date'
+                                    }
+                                },
+                                y: {
+                                    title: {
+                                        display: true,
+                                        text: 'Value'
+                                    }
+                                }
+                            }
+                        }
+                    });
+                } catch (error) {
+                    console.error('Error parsing or plotting chart:', error);
+                }
+            }
+            
+
+            // Event listener for form submission
+            document.getElementById('periodForm').addEventListener('submit', function (event) {
+                event.preventDefault(); // Prevent default form submission
+                const period = document.getElementById('period').value; // Get selected period
+                fetchForecastData(period); // Fetch forecast data for selected period
+            });
+
+            // Fetch forecast data for initial period on page load
+            fetchForecastData('daily');
+        });
+    </script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 import json
 import logging
-from flask import Flask, request, render_template, jsonify, redirect, session, url_for
+from flask import Flask, make_response, request, render_template, jsonify, redirect, session, url_for
 from flask import redirect
 from flask_session import Session 
 import numpy as np
@@ -12,6 +12,8 @@ from sklearn.metrics import mean_squared_error
 from datetime import datetime, timedelta, date
 from collections import defaultdict
 import warnings
+from flask import send_file
+import io
 
 app = Flask(__name__)
 app.secret_key = '089724'
@@ -152,6 +154,18 @@ def forecast_sales(data, period=None):
             # Forecast for the remaining months in the year
             future = pd.date_range(start=sales_df.index[-1], periods=12-start_month+1, freq='M')
 
+            # Calculate weekly forecasts for the remaining weeks in the current month
+            current_month = sales_df.index[-1].month
+            current_year = sales_df.index[-1].year
+            current_week = sales_df.index[-1].week
+            current_weekday = sales_df.index[-1].weekday()
+            remaining_weeks = (pd.Timestamp(year=current_year, month=current_month, day=1) + pd.offsets.MonthEnd(0)).week - current_week
+
+            for i in range(1, remaining_weeks + 1):
+                start_week = sales_df.index[-1] + pd.Timedelta(days=7 * i)
+                end_week = start_week + pd.Timedelta(days=6)
+                future = future.append(pd.date_range(start=start_week, end=end_week, freq='D'))
+
         elif period == 'quarterly':
             # Get the start quarter for the forecast period
             start_quarter = sales_df.index[-1].quarter
@@ -162,8 +176,14 @@ def forecast_sales(data, period=None):
             # Forecast for the next 5 years
             future = pd.date_range(start=sales_df.index[-1], periods=5, freq='Y')
 
+        elif period == 'weekly':  # Adjusted handling for weekly period
+            # Get the start week for the forecast period
+            start_week = sales_df.index[-1].week
+            # Forecast for the next 5 weeks
+            future = pd.date_range(start=sales_df.index[-1], periods=5, freq='W')
+
         else:
-            raise ValueError("Invalid period. Please choose 'daily', 'monthly', 'quarterly', or 'yearly'.")
+            raise ValueError("Invalid period. Please choose 'daily', 'monthly', 'quarterly', 'yearly', or 'weekly'.")
 
         future_df = pd.DataFrame({'Date': future, 'Sales': 0})  # Initialize sales to 0
 
@@ -196,6 +216,90 @@ def forecast_sales(data, period=None):
                                     'Lower Bound': lower_bound})
 
         return forecast_df
+    
+    except Exception as e:
+        print("An error occurred:", e)
+        return None
+
+# Function to convert raw data into a DataFrame
+def convert_to_dataframe(raw_data):
+    try:
+        df = pd.DataFrame(raw_data, columns=["Sales", "Date", "Time", "Quantity Sold"])
+        print("DataFrame created from raw data:")
+        print(df.head())  # Print the first few rows of the DataFrame
+        df['DateTime'] = pd.to_datetime(df['Date'] + ' ' + df['Time'])
+        print("DataFrame after adding DateTime column:")
+        print(df.head())  # Print the first few rows of the DataFrame with DateTime column
+        return df[['DateTime', 'Sales', 'Quantity Sold']]
+    except Exception as e:
+        print(f"An error occurred during data conversion: {e}")
+        return None
+
+def forecast_peak_sales_period(sales_df, period):
+    try:
+        # Resample data based on the selected period
+        if period == 'daily':
+            last_date = sales_df['DateTime'].max()
+            peak_sales_period_data = sales_df[(sales_df['DateTime'] >= last_date - pd.DateOffset(days=7)) & (sales_df['DateTime'] <= last_date)]
+            future_dates = pd.date_range(start=last_date + pd.Timedelta(days=1), periods=5, freq='D')
+        elif period == 'weekly':
+            last_date = sales_df['DateTime'].max()
+            peak_sales_period_data = sales_df[(sales_df['DateTime'] >= last_date - pd.DateOffset(weeks=1)) & (sales_df['DateTime'] <= last_date)]
+            future_dates = pd.date_range(start=last_date + pd.Timedelta(weeks=1), periods=5, freq='W')
+        elif period == 'monthly':
+            last_date = sales_df['DateTime'].max()
+            last_month_end = pd.Timestamp(pd.offsets.MonthEnd().rollback(last_date))
+            peak_sales_period_data = sales_df[(sales_df['DateTime'] >= last_month_end) & (sales_df['DateTime'] <= last_date)]
+            future_dates = pd.date_range(start=last_date + pd.DateOffset(months=1), periods=5, freq='M')
+        elif period == 'quarterly':
+            last_date = sales_df['DateTime'].max()
+            last_quarter_start = pd.Timestamp(pd.Timestamp(last_date).to_period('Q').start_time)
+            peak_sales_period_data = sales_df[(sales_df['DateTime'] >= last_quarter_start) & (sales_df['DateTime'] <= last_date)]
+            future_dates = pd.date_range(start=last_date + pd.DateOffset(months=3), periods=5, freq='Q')
+        else:
+            raise ValueError("Invalid period. Please choose 'daily', 'weekly', 'monthly', or 'quarterly'.")
+
+        # Divide sales by 100 for forecast
+        peak_sales_period_data.loc[:, 'Sales'] /= 100
+
+        # Calculate the total sales and quantity sold for the peak sales period
+        total_sales = peak_sales_period_data['Sales'].sum()
+        total_quantity_sold = peak_sales_period_data['Quantity Sold'].sum()
+
+        # Calculate the number of days, weeks, months, or quarters in the selected period
+        if period == 'daily':
+            period_length = 7
+        elif period == 'weekly':
+            period_length = 1
+        elif period == 'monthly':
+            period_length = (last_date - last_month_end).days + 1
+        elif period == 'quarterly':
+            period_length = (last_date - last_quarter_start).days + 1
+
+        # Calculate the mean sales and quantity sold for the peak sales period
+        mean_sales = total_sales / period_length
+        mean_quantity_sold = total_quantity_sold / period_length
+
+        # Create a DataFrame for the forecasted sales and quantity
+        forecasted_sales = pd.DataFrame({
+            'DateTime': future_dates,
+            'Sales': [mean_sales] * len(future_dates),
+            'Quantity Sold': [mean_quantity_sold] * len(future_dates)
+        })
+
+        # Print sales DataFrame before filtering
+        print("Sales DataFrame before filtering:")
+        print(sales_df)
+
+        # Print peak sales period data
+        print("Peak sales period data:")
+        print(peak_sales_period_data)
+
+        # Print forecasted sales and quantity data
+        print("Peak sales period forecast:")
+        print(forecasted_sales)
+
+        return forecasted_sales
 
     except Exception as e:
         print(f"An error occurred during analysis: {e}")
@@ -305,10 +409,20 @@ def forecast_product(product_data, period=None):
             model_quantity = xgb.XGBRegressor(objective='reg:squarederror')
             model_quantity.fit(X_quantity, y_quantity)
 
+            # Initialize future DataFrame
+            future_df = pd.DataFrame()
+
             # Forecast
             if period == 'daily':
                 forecast_steps = 5
                 freq = 'D'
+            elif period == 'weekly':
+                # Find the next Saturday after the last sales date
+                next_saturday = product_df['Date of Sales'].max() + pd.offsets.Week(weekday=5)
+                # Forecast for the next week starting from the next Saturday
+                future = pd.date_range(start=next_saturday, periods=7, freq='D')
+                freq = 'W'
+                forecast_steps = 1
             elif period == 'monthly':
                 remaining_months = 12 - product_df['Date of Sales'].dt.month.max()
                 forecast_steps = remaining_months + 1  # Include the current month
@@ -321,7 +435,7 @@ def forecast_product(product_data, period=None):
                 forecast_steps = 5 * 12  # 5 years
                 freq = 'M'
             else:
-                raise ValueError("Invalid period. Please choose 'daily', 'monthly', 'quarterly', or 'yearly'.")
+                raise ValueError("Invalid period. Please choose 'daily', 'weekly', 'monthly', 'quarterly', or 'yearly'.")
 
             future = pd.date_range(start=product_df['Date of Sales'].iloc[-1], periods=forecast_steps, freq=freq)
             future_df = pd.DataFrame({'Date': future, 'Quantity Sold': 0, 'Total Sales': 0})  # Remove initialization of 'Forecasted Quantity' to 0
@@ -334,6 +448,9 @@ def forecast_product(product_data, period=None):
 
             # Predict forecasted quantities
             forecast_quantity = model_quantity.predict(future_df[['Year', 'Month', 'Quarter', 'Quantity Sold']])
+            
+            # Round forecasted quantity to the nearest integer
+            forecast_quantity = np.round(forecast_quantity)
 
             # Create forecast DataFrame for the current product
             forecast_product_df = pd.DataFrame({'Product ID': product_id,
@@ -359,9 +476,32 @@ def forecast_product(product_data, period=None):
     except Exception as e:
         print(f"An error occurred in the forecast_product function: {e}")
         return None
-    
+
 # Suppress FutureWarning for DataFrame concatenation
 warnings.filterwarnings("ignore", message="The behavior of DataFrame concatenation with empty or all-NA entries is deprecated.")
+
+def download_product_forecast_csv(forecast_data):
+    try:
+        # Create a StringIO object to store CSV data
+        csv_buffer = io.StringIO()
+
+        # Write forecast data to the StringIO buffer as CSV
+        forecast_data.to_csv(csv_buffer, index=False)
+
+        # Set response headers for CSV download
+        headers = {
+            "Content-Disposition": "attachment; filename=product_forecast.csv",
+            "Content-Type": "text/csv",
+        }
+
+        # Create response object with CSV data
+        response = make_response(csv_buffer.getvalue())
+        response.headers = headers
+
+        return response
+    except Exception as e:
+        print("An error occurred while generating CSV:", e)
+        return None
 
 def calculate_product_trend(product_data, product_name, period):
     print("Calculating product trend...")
@@ -690,6 +830,58 @@ def result1():
             print("An error occurred in the result1 route:", e)
             return jsonify({"error": f"Error: {e}"}), 500
 
+@app.route('/result1b', methods=['GET', 'POST'])
+def result1b():
+    if request.method == 'POST':
+        try:
+            # Get the processed data and sales DataFrame from the session
+            processed_data = session.get('raw_data')
+            sales_df = session.get('sales_df')  # Retrieve sales DataFrame from session
+
+            print("Raw data retrieved from session:", processed_data)
+            print("Sales DataFrame retrieved from session:", sales_df)
+
+            if processed_data is None or len(processed_data) == 0:
+                return jsonify({"error": "Processed data is None or empty."}), 500
+
+            # Get the selected period from the form data
+            selected_period = request.form.get('period')
+            
+            # Print the selected data to the terminal for debugging
+            print("Selected period:", selected_period)
+
+            # Define the forecast message based on the selected period
+            forecast_message = "Peak sales period forecast - {}".format(selected_period.capitalize())
+            print(forecast_message)
+
+            # Check if the period is provided by the user
+            if selected_period is None:
+                return render_template('result2.html', error="Please select a period for forecasting.")
+
+            # Perform peak sales period forecast calculation based on the sales data and selected period
+            peak_sales_period = forecast_peak_sales_period(sales_df, period=selected_period)
+            print("Peak sales period forecast:", peak_sales_period)
+
+            if peak_sales_period is None:
+                # If peak_sales_period is None, return an error message
+                return jsonify({"error": "Failed to forecast peak sales period."}), 500
+
+            # Convert DataFrame to list of dictionaries for proper serialization
+            peak_sales_period_json = peak_sales_period.to_dict(orient='records')
+
+            # Return the forecasted peak sales period
+            return jsonify({
+                "forecast_message": forecast_message,
+                "peak_sales_period": peak_sales_period_json
+            })
+
+        except Exception as e:
+            print("An error occurred in the result1b route:", e)
+            return jsonify({"error": f"Error: {e}"}), 500
+    else:
+        # If it's a GET request, render the result1b.html template
+        return render_template('result1b.html')
+
 @app.route('/result2', methods=['GET', 'POST'])
 def result2():
     if request.method == 'POST':
@@ -776,6 +968,29 @@ def result2():
     else:
         # If it's a GET request, render the result2.html template
         return render_template('result2.html')
+    
+@app.route('/download_product_forecast', methods=['POST'])
+def download_product_forecast():
+    try:
+        forecast_data = request.json.get('forecast_data')
+
+        if forecast_data is None:
+            print("Forecast data is missing in the request.")
+            return jsonify({"error": "Forecast data is missing in the request."}), 400
+
+        forecast_df = pd.DataFrame(forecast_data)
+
+        # Call the download_product_forecast_csv function to generate CSV file
+        csv_response = download_product_forecast_csv(forecast_df)
+
+        if csv_response is None:
+            print("Failed to generate CSV file.")
+            return jsonify({"error": "Failed to generate CSV file."}), 500
+
+        return csv_response
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return jsonify({"error": f"An error occurred: {e}"}), 500
 
 @app.route('/result2b', methods=['GET', 'POST'])
 def result2b():

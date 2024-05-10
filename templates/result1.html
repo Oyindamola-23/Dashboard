@@ -42,6 +42,17 @@
             right: 20px;
         }
 
+        #nextButton {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #333;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            align-self: flex-end;
+        }
+
         #backButton {
             position: fixed;
             bottom: 20px;
@@ -64,12 +75,34 @@
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
         }
 
-        .total-sales, .total-units {
+        .total-sales,
+        .total-units {
             flex-basis: 45%;
             border: 1px solid #ccc;
             border-radius: 5px;
             padding: 10px;
             background-color: #fff; /* Add white background */
+        }
+
+        .loader {
+            border: 16px solid #f3f3f3;
+            border-top: 16px solid #3498db;
+            border-radius: 50%;
+            width: 120px;
+            height: 120px;
+            animation: spin 2s linear infinite;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            margin-top: -60px;
+            margin-left: -60px;
+            z-index: 1000;
+            display: none;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
@@ -79,7 +112,7 @@
     </div>
     <div class="totals-container">
         <div class="total-sales">
-            <h2>Total Sales</h2>
+            <h2>Total Sales (NGN)</h2>
             <p>{{ total_sales | round(2) }}</p>
         </div>
         <div class="total-units">
@@ -95,6 +128,7 @@
             <label for="period">Sales Forecast</label>
             <select name="period" id="period">
                 <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
                 <option value="monthly">Monthly</option>
                 <option value="quarterly">Quarterly</option>
                 <option value="yearly">Yearly</option>
@@ -105,12 +139,18 @@
             <!-- Canvas for Chart.js chart -->
             <canvas id="salesChart"></canvas>
         </div>
+        <!-- Next button -->
+        <button id="nextButton">Next</button>
+    </div>
     <!-- Back button -->
     <button id="backButton" onclick="window.history.back()">Back</button>
+    <!-- Loader -->
+    <div class="loader" id="loader"></div>
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             let chart = null; // Variable to hold the chart instance
-            
+            const loader = document.getElementById('loader'); // Get the loader element
+
             // Function to convert timestamp to date format
             function formatDate(timestamp) {
                 const date = new Date(timestamp);
@@ -123,7 +163,10 @@
             document.getElementById('periodForm').addEventListener('submit', function (e) {
                 e.preventDefault(); // Prevent default form submission
                 const formData = new FormData(this); // Get form data
-                
+
+                // Show loader while fetching data
+                loader.style.display = 'block';
+
                 // Destroy the existing chart if it exists
                 if (chart) {
                     chart.destroy();
@@ -240,14 +283,27 @@
                             }
                         }
                     };
+
+                    // Hide loader after data is fetched and chart is rendered
+                    loader.style.display = 'none';
                 })
                 .catch(error => {
                     console.error('Error:', error);
                     // Log the response text if available
                     console.error('Response Text:', error?.response?.text);
+                    // Hide loader if there's an error
+                    loader.style.display = 'none';
                 });
-            });                              
-        });                
+            });
+
+            document.getElementById('nextButton').addEventListener('click', function() {
+                const urlParams = new URLSearchParams(window.location.search);
+                const startDate = urlParams.get('start_date');
+                const endDate = urlParams.get('end_date');
+                
+                window.location.href = '{{ url_for('result1b') }}?start_date=' + encodeURIComponent(startDate) + '&end_date=' + encodeURIComponent(endDate);
+            });
+        });
     </script>        
 </body>
 </html>

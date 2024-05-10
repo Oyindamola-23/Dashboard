@@ -5,6 +5,23 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
     <style>
+        /* Add CSS for loader */
+        .loader {
+            border: 4px solid #f3f3f3; /* Light grey */
+            border-top: 4px solid #3498db; /* Blue */
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 2s linear infinite;
+            margin: auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Rest of the CSS styles */
         body {
             font-family: Arial, sans-serif;
             background-color: #f4f4f4;
@@ -95,6 +112,8 @@
                 <option value="yearly">Yearly</option>
             </select>
             <input type="submit" value="Generate Product Trends">
+            <!-- Loader element -->
+            <div id="loader" class="loader" style="display: none;"></div>
         </form>
         <!-- Canvas for Chart.js chart -->
         <canvas id="productTrends"></canvas>
@@ -110,6 +129,8 @@
         // Function to fetch product trend data from the server
         function fetchProductTrendData() {
             console.log('Fetching product trend data...');
+            // Show loader
+            document.getElementById('loader').style.display = 'block';
             fetch('/result2b', {
                 method: 'POST',
                 headers: {
@@ -192,8 +213,14 @@
                         }
                     }
                 });
+                // Hide loader
+                document.getElementById('loader').style.display = 'none';
             })
-            .catch(error => console.error('Error fetching product trend data:', error));
+            .catch(error => {
+                console.error('Error fetching product trend data:', error);
+                // Hide loader
+                document.getElementById('loader').style.display = 'none';
+            });
         }
 
         // Function to clear existing chart and info
@@ -233,4 +260,3 @@
     </script>
 </body>
 </html>
-

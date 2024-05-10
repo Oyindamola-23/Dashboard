@@ -4,6 +4,23 @@
     <title>Product Recommendation Dashboard</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
     <style>
+        /* Add CSS for loader */
+        .loader {
+            border: 4px solid #f3f3f3; /* Light grey */
+            border-top: 4px solid #3498db; /* Blue */
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 2s linear infinite;
+            margin: auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Rest of the CSS styles */
         body {
             font-family: Arial, sans-serif;
             background-color: #f4f4f4;
@@ -74,10 +91,14 @@
         </div>
         <canvas id="customerAnalysis"></canvas>
         <div id="customerAnalysisTable"></div>
+        <!-- Loader element -->
+        <div id="loader" class="loader" style="display: none;"></div>
     </div>
     <button id="backButton" onclick="window.history.back()">Back</button>
     <script>
         function fetchCustomerAnalysisData() {
+            // Show loader
+            document.getElementById('loader').style.display = 'block';
             fetch('/result2c', {
                 method: 'POST',
                 headers: {
@@ -130,8 +151,14 @@
                 });
         
                 updateCustomerAnalysisTable(data);
+                // Hide loader
+                document.getElementById('loader').style.display = 'none';
             })
-            .catch(error => console.error('Error fetching customer analysis data:', error));
+            .catch(error => {
+                console.error('Error fetching customer analysis data:', error);
+                // Hide loader
+                document.getElementById('loader').style.display = 'none';
+            });
         }        
 
         function updateCustomerAnalysisTable(data) {

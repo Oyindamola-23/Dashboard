@@ -5,6 +5,23 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
     <style>
+        /* Add CSS for loader */
+        .loader {
+            border: 4px solid #f3f3f3; /* Light grey */
+            border-top: 4px solid #3498db; /* Blue */
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 2s linear infinite;
+            margin: auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Rest of the CSS styles */
         body {
             font-family: Arial, sans-serif;
             background-color: #f4f4f4;
@@ -78,15 +95,19 @@
             background-color: #f2f2f2;
         }
 
-        #nextButton {
-            margin-top: 10px; /* Reduce margin between table and button */
+        #buttonsContainer {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px; /* Add margin between table and buttons */
+        }
+
+        #nextButton, #downloadButton {
             padding: 10px;
             background-color: #333;
             color: #fff;
             border: none;
             border-radius: 5px;
             cursor: pointer;
-            align-self: flex-end;
         }
     </style>
 </head>
@@ -106,16 +127,24 @@
             <label for="period">Product Forecast</label>
             <select name="period" id="period">
                 <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
                 <option value="monthly">Monthly</option>
                 <option value="quarterly">Quarterly</option>
                 <option value="yearly">Yearly</option>
             </select>
             <input type="submit" value="Generate Forecast">
+            <!-- Loader element -->
+            <div id="loader" class="loader" style="display: none;"></div>
         </form>
         <!-- Table for top 10 products -->
         <div id="productTable"></div>
-        <!-- Next button -->
-        <button id="nextButton">Next</button>
+        <!-- Button container -->
+        <div id="buttonsContainer">
+            <!-- Download button -->
+            <button id="downloadButton">Download Forecast</button>
+            <!-- Next button -->
+            <button id="nextButton">Next</button>
+        </div>
     </div>
     <!-- Back button -->
     <button id="backButton" onclick="window.history.back()">Back</button>
@@ -136,6 +165,9 @@
             document.getElementById('periodForm').addEventListener('submit', function (e) {
                 e.preventDefault(); // Prevent default form submission
                 const formData = new FormData(this); // Get form data
+
+                // Show loader
+                document.getElementById('loader').style.display = 'block';
                 
                 // Send form data to the server using fetch
                 fetch('/result2', {
@@ -151,6 +183,9 @@
                 .then(data => {
                     console.log('Response from server:', data); // Log the response data
                     
+                    // Hide loader
+                    document.getElementById('loader').style.display = 'none';
+
                     // Handle response data
                     const topProducts = data.top_10_products; // Get top 10 products
                     const productNames = topProducts.map(entry => entry['Product Title']);
@@ -247,6 +282,9 @@
                     console.error('Error:', error);
                     // Log the response text if available
                     console.error('Response Text:', error?.response?.text);
+
+                    // Hide loader
+                    document.getElementById('loader').style.display = 'none';
                 });
             });
 
@@ -259,6 +297,35 @@
                 
                 // Redirect to result2b route with the same start_date and end_date parameters
                 window.location.href = '{{ url_for('result2b') }}?start_date=' + encodeURIComponent(startDate) + '&end_date=' + encodeURIComponent(endDate);
+            });
+
+            // Trigger download when Download Forecast button is clicked
+            document.getElementById('downloadButton').addEventListener('click', function() {
+                fetch('/download_product_forecast', {
+                    method: 'POST',
+                    body: JSON.stringify({ forecast_data: chart.data }),
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.blob();
+                })
+                .then(blob => {
+                    const url = window.URL.createObjectURL(new Blob([blob]));
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'product_forecast.csv';
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
             });
         });
 
