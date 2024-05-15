@@ -192,6 +192,8 @@
                     const forecastedSales = topProducts.map(entry => entry['Forecasted Sales']);
                     const forecastedQuantities = topProducts.map(entry => entry['Forecasted Quantity']);
                     const selectedPeriod = document.getElementById('period').value;
+                    const periodText = getPeriodText(selectedPeriod);
+                    const showPeriod = true; // Set to true if you want to display the period information
         
                     // Destroy existing chart if it exists
                     if (chart) {
@@ -259,24 +261,36 @@
                     });
 
                     // Display top 10 products in tabular form
-                    const tableData = topProducts.map((product, index) => `<tr><td>${index + 1}</td><td>${product['Product ID']}</td><td>${product['Product Title']}</td><td>${product['Forecasted Quantity']}</td><td>${product['Forecasted Sales']}</td></tr>`).join('');
-                    document.getElementById('productTable').innerHTML = `
-                        <h2>Top 10 products to stock up on - ${selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)}</h2>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>Product ID</th>
-                                    <th>Product Title</th>
-                                    <th>Quantity</th>
-                                    <th>Sales (NGN)</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${tableData}
-                            </tbody>
-                        </table>
-                    `;
+                    const tableData = topProducts.map((product, index) => {
+                        // Round forecasted sales to the nearest integer
+                        const forecastedSales = Math.round(product['Forecasted Sales']);
+                        // Construct table row HTML
+                        return `<tr><td>${index + 1}</td><td>${product['Product ID']}</td><td>${product['Product Title']}</td><td>${product['Forecasted Quantity']}</td><td>${forecastedSales}</td></tr>`;
+                    }).join('');
+
+                    // Generate the HTML content conditionally including period information
+                    let tableHTML = '';
+                    if (showPeriod) {
+                        tableHTML += `<h3>Top 10 products to stock up on ${periodText}</h3>`;
+                    }
+
+                    tableHTML += `<table>
+                                    <thead>
+                                        <tr>
+                                            <th>#</th>
+                                            <th>Product ID</th>
+                                            <th>Product Title</th>
+                                            <th>Quantity</th>
+                                            <th>Sales (NGN)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${tableData}
+                                    </tbody>
+                                </table>`;
+
+                    // Append the table to the productTable div
+                    document.getElementById('productTable').innerHTML = tableHTML;
                 })
                 .catch(error => {
                     console.error('Error:', error);
@@ -301,37 +315,69 @@
 
             // Trigger download when Download Forecast button is clicked
             document.getElementById('downloadButton').addEventListener('click', function() {
-                fetch('/download_product_forecast', {
-                    method: 'POST',
-                    body: JSON.stringify({ forecast_data: chart.data }),
-                    headers: {
-                        'Content-Type': 'application/json'
+                const table = document.getElementById('productTable').getElementsByTagName('table')[0];
+                const rows = table.getElementsByTagName('tr');
+                const data = [];
+                
+                // Get the selected period
+                const selectedPeriod = document.getElementById('period').value;
+                const periodText = getPeriodText(selectedPeriod);
+                
+                // Add period information to the data
+                data.push(`Top 10 products to stock up on ${periodText}`);
+                
+                // Add timestamp
+                data.push(`Downloaded at: ${formatDate(Date.now())}`);
+                
+                // Get table header
+                const headerRow = table.getElementsByTagName('thead')[0].getElementsByTagName('tr')[0];
+                const headerCells = headerRow.getElementsByTagName('th');
+                const headerData = [];
+                for (let i = 0; i < headerCells.length; i++) {
+                    headerData.push(headerCells[i].innerText.trim()); // Trim whitespace
+                }
+                data.push(headerData.join(',')); // Add header row to data array
+                
+                // Get table body rows
+                for (let i = 0; i < rows.length; i++) {
+                    const cells = rows[i].getElementsByTagName('td');
+                    const rowData = [];
+                    for (let j = 0; j < cells.length; j++) {
+                        rowData.push(cells[j].innerText.trim()); // Trim whitespace
                     }
-                })
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Network response was not ok');
-                    }
-                    return response.blob();
-                })
-                .then(blob => {
-                    const url = window.URL.createObjectURL(new Blob([blob]));
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = 'product_forecast.csv';
-                    document.body.appendChild(a);
-                    a.click();
-                    window.URL.revokeObjectURL(url);
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                });
+                    data.push(rowData.join(','));
+                }
+                
+                const csvContent = 'data:text/csv;charset=utf-8,' + encodeURIComponent(data.join('\n'));
+                const link = document.createElement('a');
+                link.setAttribute('href', csvContent);
+                link.setAttribute('download', 'product_forecast.csv');
+                document.body.appendChild(link);
+                link.click();
             });
         });
 
         // Function to display product details
         function showProductDetails(productTitle, quantity, sales) {
             alert(`Product Name: ${productTitle}\nQuantity: ${quantity}\nSales (NGN): ${sales}`);
+        }
+
+        // Function to get text for the period
+        function getPeriodText(period) {
+            switch(period) {
+                case 'daily':
+                    return 'Daily';
+                case 'weekly':
+                    return 'Weekly';
+                case 'monthly':
+                    return 'Monthly';
+                case 'quarterly':
+                    return 'Quarterly';
+                case 'yearly':
+                    return 'Yearly';
+                default:
+                    return '';
+            }
         }
     </script>        
 </body>

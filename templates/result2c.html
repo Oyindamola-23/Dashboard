@@ -79,6 +79,22 @@
         th {
             background-color: #f2f2f2;
         }
+
+        #downloadButton, #nextButton {
+            padding: 10px;
+            background-color: #333;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        #buttonsContainer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between; /* Spread buttons to the edges */
+            margin-top: 10px;
+        }
     </style>
 </head>
 <body>
@@ -93,6 +109,13 @@
         <div id="customerAnalysisTable"></div>
         <!-- Loader element -->
         <div id="loader" class="loader" style="display: none;"></div>
+        <!-- Buttons container -->
+        <div id="buttonsContainer">
+            <!-- Download button -->
+            <button id="downloadButton">Download Table Data</button>
+            <!-- Next button -->
+            <button id="nextButton">Next</button>
+        </div>
     </div>
     <button id="backButton" onclick="window.history.back()">Back</button>
     <script>
@@ -198,6 +221,42 @@
 
         window.addEventListener('load', () => {
             fetchCustomerAnalysisData();
+        });
+
+        // Function to trigger download of table data as CSV
+        document.getElementById('downloadButton').addEventListener('click', function() {
+            const table = document.querySelector('#customerAnalysisTable table');
+            const rows = table.querySelectorAll('tr');
+            const csvData = [];
+            rows.forEach(row => {
+                const rowData = [];
+                row.querySelectorAll('th, td').forEach(cell => {
+                    rowData.push(cell.innerText.trim());
+                });
+                csvData.push(rowData.join(','));
+            });
+
+            // Add timestamp
+            const timestamp = new Date().toISOString().split('T')[0];
+            csvData.unshift(`Downloaded at: ${timestamp}`); // Insert timestamp at the beginning of the CSV data
+
+            const csvContent = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvData.join('\n'));
+            const downloadLink = document.createElement('a');
+            downloadLink.setAttribute('href', csvContent);
+            downloadLink.setAttribute('download', 'customer_analysis.csv');
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+        });
+
+        // Redirect to result2b page when Next button is clicked
+        document.getElementById('nextButton').addEventListener('click', function() {
+            // Get the start_date and end_date from the current URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const startDate = urlParams.get('start_date');
+            const endDate = urlParams.get('end_date');
+            
+            // Redirect to result2b route with the same start_date and end_date parameters
+            window.location.href = '{{ url_for('result2b') }}?start_date=' + encodeURIComponent(startDate) + '&end_date=' + encodeURIComponent(endDate);
         });
     </script>
 </body>
